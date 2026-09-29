@@ -1,34 +1,119 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Board } from './components/Board'
 import { HUD } from './components/HUD'
 import { ResultModal } from './components/ResultModal'
-import { DIFFICULTIES } from './data/cards'
+import {
+  DIFFICULTIES,
+  MODES,
+  getItemById,
+  type Difficulty,
+  type Mode,
+} from './data/cards'
+import { RESOURCES } from './data/resources'
 import { useGame } from './hooks/useGame'
 import { useHighScore } from './hooks/useHighScore'
+import { isSoundEnabled, setSoundEnabled } from './utils/sound'
+
+type Settings = { mode: Mode; difficulty: Difficulty }
 
 export default function App() {
   const { state, startGame, flipCard } = useGame()
-  const { highScore, saveIfBetter } = useHighScore()
+  const { best, saveIfBetter } = useHighScore()
+  const [settings, setSettings] = useState<Settings>({ mode: 'clasico', difficulty: 'normal' })
   const [showResult, setShowResult] = useState(false)
   const [isRecord, setIsRecord] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+  )
 
   const totalPairs = state.deck.length / 2
   const matchedIds = useMemo(() => [...state.matched], [state.matched])
+  const finished = state.status === 'won' || state.status === 'lost'
 
   useEffect(() => {
     if (state.status !== 'won') return
-    const result = { score: state.score, seconds: state.seconds, moves: state.moves }
-    setIsRecord(saveIfBetter(result))
+    setIsRecord(saveIfBetter(state.difficulty, state.mode, {
+      score: state.score,
+      seconds: state.seconds,
+      moves: state.moves,
+    }))
     setShowResult(true)
   }, [state.status])
 
+  useEffect(() => {
+    if (state.status === 'lost') setShowResult(true)
+  }, [state.status])
+
+  const previousRef = useRef(state)
+  useEffect(() => {
+    const previous = previousRef.current
+    previousRef.current = state
+    if (previous === state) return
+
+    if (state.status === 'won') {
+      setAnnouncement('¡Partida completada! Todos los pares encontrados.')
+      return
+    }
+    if (state.status === 'lost') {
+      setAnnouncement(state.loseReason === 'time' ? 'Se acabó el tiempo.' : 'Sin vidas restantes.')
+      return
+    }
+    if (state.matched.size > previous.matched.size) {
+      const newId = matchedIds.find((id) => !previous.matched.has(id))
+      const item = newId ? getItemById(newId) : undefined
+      if (item) {
+        setAnnouncement(`Par encontrado: ${item.label}.`)
+        return
+      }
+    }
+    if (state.flipped.length === 2 && previous.flipped.length === 1) {
+      setAnnouncement('No coinciden.')
+      return
+    }
+    if (state.flipped.length === 1 && previous.flipped.length === 0) {
+      const item = getItemById(state.deck[state.flipped[0]]?.itemId ?? '')
+      if (item) setAnnouncement(`Carta volteada: ${item.label}.`)
+    }
+  }, [state, matchedIds])
+
+  const applySettings = (next: Settings) => {
+    setSettings(next)
+    if (state.status !== 'idle') {
+      setShowResult(false)
+      startGame(next.mode, next.difficulty)
+    }
+  }
+
   const restart = () => {
     setShowResult(false)
-    startGame(state.difficulty)
+    startGame(settings.mode, settings.difficulty)
+  }
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundEnabled(next)
+    setSoundOn(next)
+  }
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.dataset.theme = next
+    try {
+      localStorage.setItem('salud-mental:theme', next)
+    } catch {
+      /* almacenamiento no disponible */
+    }
+    setTheme(next)
   }
 
   return (
     <div className="app">
+      <div className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </div>
+
       <header className="header">
         <div className="header__brand">
           <span className="header__logo" aria-hidden="true">
@@ -41,20 +126,42 @@ export default function App() {
           </div>
         </div>
 
-        <div className="header__levels" role="group" aria-label="Dificultad">
-          {DIFFICULTIES.map((level) => (
-            <button
-              key={level.id}
-              type="button"
-              className={`chip ${state.difficulty === level.id && state.status !== 'idle' ? 'chip--active' : ''}`}
-              onClick={() => {
-                setShowResult(false)
-                startGame(level.id)
-              }}
-            >
-              {level.label} · {level.pairs}
-            </button>
-          ))}
+        <div className="header__controls">
+          <div className="header__levels" role="group" aria-label="Dificultad">
+            {DIFFICULTIES.map((level) => (
+              <button
+                key={level.id}
+                type="button"
+                className={`chip ${settings.difficulty === level.id ? 'chip--active' : ''}`}
+                onClick={() => applySettings({ ...settings, difficulty: level.id })}
+              >
+                {level.label} · {level.pairs}
+              </button>
+            ))}
+          </div>
+
+          <div className="header__levels" role="group" aria-label="Modo de juego">
+            {MODES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                className={`chip ${settings.mode === mode.id ? 'chip--active' : ''}`}
+                title={mode.hint}
+                onClick={() => applySettings({ ...settings, mode: mode.id })}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="chip chip--icon"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
@@ -66,13 +173,19 @@ export default function App() {
               Voltea las cartas y encuentra las parejas de hábitos, emociones y técnicas que cuidan tu
               bienestar. Cada pareja que descubras te da un consejo para llevar.
             </p>
+            <p className="start__mode">
+              Modo seleccionado: <strong>{MODES.find((m) => m.id === settings.mode)?.label}</strong>
+            </p>
             <div className="start__levels">
               {DIFFICULTIES.map((level) => (
                 <button
                   key={level.id}
                   type="button"
                   className="btn btn--primary"
-                  onClick={() => startGame(level.id)}
+                  onClick={() => {
+                    setSettings({ ...settings, difficulty: level.id })
+                    startGame(settings.mode, level.id)
+                  }}
                 >
                   {level.label} · {level.pairs} pares
                 </button>
@@ -87,14 +200,19 @@ export default function App() {
               score={state.score}
               matchedCount={state.matched.size}
               totalPairs={totalPairs}
-              best={highScore}
+              mode={state.mode}
+              timeLimit={state.timeLimit}
+              lives={state.lives}
+              best={best(state.difficulty, state.mode)}
+              soundEnabled={soundOn}
+              onToggleSound={toggleSound}
               onRestart={restart}
             />
             <Board
               deck={state.deck}
               flipped={state.flipped}
               matched={state.matched}
-              status={state.status}
+              locked={state.status !== 'playing'}
               onFlip={flipCard}
             />
           </>
@@ -103,19 +221,33 @@ export default function App() {
 
       <footer className="footer">
         <p className="footer__sena">Proyecto de formación · SENA</p>
+        <p className="footer__help">
+          Ayuda inmediata:{' '}
+          {RESOURCES.map((resource, index) => (
+            <span key={resource.id}>
+              {index > 0 && ' · '}
+              <a href={resource.href} target={resource.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                {resource.name}
+              </a>
+            </span>
+          ))}
+        </p>
         <p>
           Este juego no sustituye atención profesional. Si lo necesitas, habla con alguien o busca apoyo
           especializado.
         </p>
       </footer>
 
-      {showResult && state.status === 'won' && (
+      {showResult && finished && (
         <ResultModal
+          status={state.status === 'won' ? 'won' : 'lost'}
+          loseReason={state.loseReason}
           score={state.score}
           moves={state.moves}
           seconds={state.seconds}
           difficulty={state.difficulty}
           matchedIds={matchedIds}
+          totalPairs={totalPairs}
           isRecord={isRecord}
           onRestart={restart}
           onClose={() => setShowResult(false)}

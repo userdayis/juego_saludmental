@@ -103,3 +103,29 @@ export const DIFFICULTIES: { id: Difficulty; label: string; pairs: number }[] = 
   { id: 'normal', label: 'Normal', pairs: 9 },
   { id: 'dificil', label: 'Difícil', pairs: 14 },
 ]
+
+export type Mode = 'clasico' | 'reloj' | 'vidas'
+
+export const MODES: { id: Mode; label: string; hint: string }[] = [
+  { id: 'clasico', label: 'Clásico', hint: 'Sin límite de tiempo ni de intentos' },
+  { id: 'reloj', label: 'Contra reloj', hint: 'Gana antes de que se acabe el tiempo' },
+  { id: 'vidas', label: 'Vidas', hint: 'Tienes pocos fallos permitidos' },
+]
+
+export const PAIRS_BY_DIFFICULTY: Record<Difficulty, number> = {
+  facil: 6,
+  normal: 9,
+  dificil: 14,
+}
+
+export const TIME_LIMITS: Record<Difficulty, number> = {
+  facil: 90,
+  normal: 150,
+  dificil: 240,
+}
+
+export const LIVES_BY_DIFFICULTY: Record<Difficulty, number> = {
+  facil: 7,
+  normal: 10,
+  dificil: 15,
+}

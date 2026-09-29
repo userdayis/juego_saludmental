@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { Difficulty, Mode } from '../data/cards'
 
 export type HighScore = {
   score: number
@@ -6,47 +7,77 @@ export type HighScore = {
   moves: number
 }
 
-const KEY = 'salud-mental:highscore'
+export type Records = Record<string, HighScore>
 
-function read(): HighScore | null {
+const KEY = 'salud-mental:records'
+const LEGACY_KEY = 'salud-mental:highscore'
+
+export function recordKey(difficulty: Difficulty, mode: Mode): string {
+  return `${difficulty}:${mode}`
+}
+
+function isHighScore(value: unknown): value is HighScore {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as HighScore).score === 'number' &&
+    typeof (value as HighScore).seconds === 'number'
+  )
+}
+
+function migrateLegacy(): Records | null {
   try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as HighScore
-    if (typeof parsed.score !== 'number') return null
-    return parsed
+    const legacy = localStorage.getItem(LEGACY_KEY)
+    if (!legacy) return null
+    const parsed: unknown = JSON.parse(legacy)
+    if (!isHighScore(parsed)) return null
+    localStorage.setItem(KEY, JSON.stringify({ 'normal:clasico': parsed }))
+    localStorage.removeItem(LEGACY_KEY)
+    return { 'normal:clasico': parsed }
   } catch {
     return null
   }
 }
 
+function read(): Records {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw)
+      if (typeof parsed === 'object' && parsed !== null) return parsed as Records
+    }
+  } catch {
+    /* almacenamiento corrupto */
+  }
+  return migrateLegacy() ?? {}
+}
+
 export function useHighScore() {
-  const [highScore, setHighScore] = useState<HighScore | null>(null)
+  const [records, setRecords] = useState<Records>({})
 
   useEffect(() => {
-    setHighScore(read())
+    setRecords(read())
   }, [])
 
-  const saveIfBetter = useCallback((result: HighScore): boolean => {
+  const saveIfBetter = useCallback((difficulty: Difficulty, mode: Mode, result: HighScore): boolean => {
     const current = read()
-    if (current && current.score >= result.score) return false
+    const key = recordKey(difficulty, mode)
+    const best = current[key]
+    if (best && best.score >= result.score) return false
+    const next: Records = { ...current, [key]: result }
     try {
-      localStorage.setItem(KEY, JSON.stringify(result))
+      localStorage.setItem(KEY, JSON.stringify(next))
     } catch {
       return false
     }
-    setHighScore(result)
+    setRecords(next)
     return true
   }, [])
 
-  const reset = useCallback(() => {
-    try {
-      localStorage.removeItem(KEY)
-    } catch {
-      /* ignore */
-    }
-    setHighScore(null)
-  }, [])
+  const best = useCallback(
+    (difficulty: Difficulty, mode: Mode): HighScore | null => records[recordKey(difficulty, mode)] ?? null,
+    [records],
+  )
 
-  return { highScore, saveIfBetter, reset }
+  return { records, best, saveIfBetter }
 }

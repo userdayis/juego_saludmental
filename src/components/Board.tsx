@@ -1,17 +1,17 @@
 import type { CSSProperties } from 'react'
 import { getItemById } from '../data/cards'
-import { Card } from './Card'
 import type { DeckCard } from '../hooks/useGame'
+import { Card } from './Card'
 
 type BoardProps = {
   deck: DeckCard[]
   flipped: number[]
   matched: Set<string>
-  status: 'idle' | 'playing' | 'won'
+  locked: boolean
   onFlip: (index: number) => void
 }
 
-export function Board({ deck, flipped, matched, status, onFlip }: BoardProps) {
+export function Board({ deck, flipped, matched, locked, onFlip }: BoardProps) {
   if (deck.length === 0) return null
   const columns = deck.length <= 12 ? 3 : deck.length <= 18 ? 4 : 5
 
@@ -32,7 +32,7 @@ export function Board({ deck, flipped, matched, status, onFlip }: BoardProps) {
             label={item.label}
             flipped={flipped.includes(index)}
             matched={matched.has(card.itemId)}
-            disabled={status !== 'playing' || flipped.length >= 2}
+            locked={locked || flipped.length >= 2}
             onClick={() => onFlip(index)}
           />
         )

@@ -1,24 +1,32 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, type CSSProperties } from 'react'
 import { CARD_ITEMS, DIFFICULTIES, type Difficulty } from '../data/cards'
+import { RESOURCES } from '../data/resources'
+import type { LoseReason } from '../hooks/useGame'
 import { formatTime } from '../utils/format'
 
 type ResultModalProps = {
+  status: 'won' | 'lost'
+  loseReason: LoseReason
   score: number
   moves: number
   seconds: number
   difficulty: Difficulty
   matchedIds: string[]
+  totalPairs: number
   isRecord: boolean
   onRestart: () => void
   onClose: () => void
 }
 
 export function ResultModal({
+  status,
+  loseReason,
   score,
   moves,
   seconds,
   difficulty,
   matchedIds,
+  totalPairs,
   isRecord,
   onRestart,
   onClose,
@@ -36,16 +44,27 @@ export function ResultModal({
     return [...pool].sort(() => Math.random() - 0.5).slice(0, 3)
   }, [matchedIds])
 
-  const pairs = DIFFICULTIES.find((d) => d.id === difficulty)?.pairs ?? 0
+  const pairs = DIFFICULTIES.find((d) => d.id === difficulty)?.pairs ?? totalPairs
+
+  const title = status === 'won' ? '¡Muy bien! 🌱' : loseReason === 'time' ? 'Se acabó el tiempo ⏳' : 'Sin vidas 💔'
+  const subtitle =
+    status === 'won'
+      ? `Completaste ${pairs} parejas en ${formatTime(seconds)} con ${moves} intentos.`
+      : `Encontraste ${matchedIds.length} de ${pairs} parejas en ${formatTime(seconds)}. ¡Inténtalo de nuevo!`
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Resultado de la partida">
       <div className="modal">
-        {isRecord && <span className="modal__badge">🏆 Nuevo récord</span>}
-        <h2 className="modal__title">¡Muy bien! 🌱</h2>
-        <p className="modal__subtitle">
-          Completaste {pairs} parejas en {formatTime(seconds)} con {moves} intentos.
-        </p>
+        {status === 'won' && (
+          <div className="confetti" aria-hidden="true">
+            {Array.from({ length: 16 }).map((_, index) => (
+              <span key={index} style={{ '--i': index } as CSSProperties} />
+            ))}
+          </div>
+        )}
+        {status === 'won' && isRecord && <span className="modal__badge">🏆 Nuevo récord</span>}
+        <h2 className="modal__title">{title}</h2>
+        <p className="modal__subtitle">{subtitle}</p>
 
         <div className="modal__score">
           <span className="modal__score-value">{score}</span>
@@ -59,6 +78,20 @@ export function ResultModal({
               <li key={tip.id} className="tips-list__item">
                 <span aria-hidden="true">{tip.icon}</span>
                 <span>{tip.tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="modal__resources">
+          <h3 className="modal__tips-title">¿Necesitas hablar con alguien?</h3>
+          <ul className="resource-list">
+            {RESOURCES.map((resource) => (
+              <li key={resource.id} className="resource-list__item">
+                <a href={resource.href} target={resource.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+                  <strong>{resource.name}</strong>
+                  <span>{resource.detail}</span>
+                </a>
               </li>
             ))}
           </ul>

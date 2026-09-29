@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eef7f2" />
+      <stop offset="100%" stop-color="#d5ece1" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect x="40" y="40" width="1120" height="550" rx="32" fill="#ffffff" stroke="#dbe7e0" stroke-width="3" />
+
+  <rect x="90" y="96" width="86" height="86" rx="20" fill="#2f9e76" />
+  <path d="M133 158c0-14 8-25 22-28-1 15-10 25-22 28zm0 0c0-14-8-25-22-28 1 15 10 25 22 28z" fill="#eafaf2" />
+  <path d="M133 158v-26" stroke="#eafaf2" stroke-width="6" stroke-linecap="round" />
+
+  <text x="90" y="290" font-family="Segoe UI, Noto Sans, DejaVu Sans, sans-serif" font-size="84" font-weight="700" fill="#1d2b25">Memoria · Salud Mental</text>
+  <text x="90" y="360" font-family="Segoe UI, Noto Sans, DejaVu Sans, sans-serif" font-size="40" fill="#55675e">Juego de memoria: hábitos, emociones y bienestar</text>
+
+  <g font-family="Segoe UI, Noto Sans, DejaVu Sans, sans-serif" font-size="30" fill="#1f7a5a" font-weight="600">
+    <rect x="90" y="420" width="300" height="66" rx="33" fill="#e6f4ee" />
+    <text x="240" y="463" text-anchor="middle">Encuentra los pares</text>
+    <rect x="410" y="420" width="270" height="66" rx="33" fill="#e6f4ee" />
+    <text x="545" y="463" text-anchor="middle">Suma puntos</text>
+    <rect x="700" y="420" width="330" height="66" rx="33" fill="#e6f4ee" />
+    <text x="865" y="463" text-anchor="middle">Llévate un tip</text>
+  </g>
+
+  <text x="90" y="545" font-family="Segoe UI, Noto Sans, DejaVu Sans, sans-serif" font-size="28" font-weight="700" fill="#1f7a5a">SENA · Servicio Nacional de Aprendizaje</text>
+</svg>

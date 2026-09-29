@@ -5,18 +5,22 @@ type CardProps = {
   label: string
   flipped: boolean
   matched: boolean
-  disabled: boolean
+  locked: boolean
   onClick: () => void
 }
 
-function CardComponent({ icon, label, flipped, matched, disabled, onClick }: CardProps) {
+function CardComponent({ icon, label, flipped, matched, locked, onClick }: CardProps) {
   const visible = flipped || matched
+  const blocked = locked || matched
   return (
     <button
       type="button"
       className={`card ${visible ? 'card--visible' : ''} ${matched ? 'card--matched' : ''}`}
-      onClick={onClick}
-      disabled={disabled || matched}
+      onClick={() => {
+        if (blocked) return
+        onClick()
+      }}
+      aria-disabled={blocked}
       aria-label={visible ? label : 'Carta boca abajo'}
       aria-pressed={visible}
     >
