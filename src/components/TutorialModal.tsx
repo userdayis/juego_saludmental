@@ -1,42 +1,32 @@
 import { useState } from 'react'
+import { useI18n } from '../i18n/context'
 
 type TutorialModalProps = {
   onClose: () => void
 }
 
 const STEPS = [
-  {
-    icon: '🃏',
-    title: 'Voltea dos cartas',
-    text: 'Toca cualquier carta boca abajo y luego otra. Si son la pareja, se quedan destapadas.',
-  },
-  {
-    icon: '🧠',
-    title: 'Encuentra todos los pares',
-    text: 'Cada intento fallido suma puntos de menos. En modo Vidas, cada fallo te cuesta una vida.',
-  },
-  {
-    icon: '🌿',
-    title: 'Llévate un tip',
-    text: 'Al terminar ganas consejos de bienestar, puntos y quizás un logro nuevo.',
-  },
+  { iconKey: 'tutorial.icon1', titleKey: 'tutorial.step1', textKey: 'tutorial.step1Text' },
+  { iconKey: 'tutorial.icon2', titleKey: 'tutorial.step2', textKey: 'tutorial.step2Text' },
+  { iconKey: 'tutorial.icon3', titleKey: 'tutorial.step3', textKey: 'tutorial.step3Text' },
 ]
 
 export function TutorialModal({ onClose }: TutorialModalProps) {
+  const { t } = useI18n()
   const [step, setStep] = useState(0)
   const current = STEPS[step]
   const last = step === STEPS.length - 1
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Cómo se juega">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={t('aria.tutorial')}>
       <div className="modal">
         <span className="tutorial__icon" aria-hidden="true">
-          {current.icon}
+          {t(current.iconKey)}
         </span>
-        <h2 className="modal__title">{current.title}</h2>
-        <p className="modal__subtitle">{current.text}</p>
+        <h2 className="modal__title">{t(current.titleKey)}</h2>
+        <p className="modal__subtitle">{t(current.textKey)}</p>
 
-        <div className="tutorial__dots" role="tablist" aria-label="Pasos">
+        <div className="tutorial__dots" role="tablist" aria-label={t('tutorial.dots')}>
           {STEPS.map((_, index) => (
             <span
               key={index}
@@ -49,7 +39,7 @@ export function TutorialModal({ onClose }: TutorialModalProps) {
         <div className="modal__actions">
           {step > 0 && (
             <button type="button" className="btn btn--ghost" onClick={() => setStep((s) => s - 1)}>
-              Atrás
+              {t('tutorial.back')}
             </button>
           )}
           <button
@@ -57,7 +47,7 @@ export function TutorialModal({ onClose }: TutorialModalProps) {
             className="btn btn--primary"
             onClick={() => (last ? onClose() : setStep((s) => s + 1))}
           >
-            {last ? '¡Entendido!' : 'Siguiente'}
+            {last ? t('tutorial.done') : t('tutorial.next')}
           </button>
         </div>
       </div>

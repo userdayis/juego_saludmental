@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
-import { computeScore } from '../hooks/useGame'
+import { ErrorBoundary } from '../components/ErrorBoundary'
+import { finalBonus, multiplierFor, timeBonus } from '../hooks/useGame'
 import { buildShareText } from '../utils/share'
+import { todayISO } from '../utils/format'
 
 const TUTORIAL_KEY = 'salud-mental:tutorial-seen'
 
@@ -41,33 +43,55 @@ function faceDownCount(grid: HTMLElement): number {
     .filter((card) => card.getAttribute('aria-label') === 'Carta boca abajo').length
 }
 
+function statByLabel(label: string): HTMLElement {
+  const el = screen
+    .getAllByText(label)
+    .map((node) => node.closest('.stat'))
+    .find(Boolean)
+  if (!el) throw new Error(`stat "${label}" not found`)
+  return el as HTMLElement
+}
+
+function scoreValue(): string {
+  const stats = screen.getAllByText('Puntos').map((node) => node.closest('.stat') as HTMLElement)
+  const score = stats.find((el) => !(el.textContent ?? '').includes('Racha'))
+  return (score?.querySelector('.stat__value')?.textContent ?? '').trim()
+}
+
+function boardLabels(grid: HTMLElement): string[] {
+  return within(grid)
+    .getAllByRole('button')
+    .map((card) => card.getAttribute('aria-label') ?? '')
+}
+
 beforeEach(() => {
   localStorage.setItem(TUTORIAL_KEY, '1')
+  window.history.replaceState({}, '', '/')
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
   localStorage.clear()
   delete document.documentElement.dataset.theme
   Reflect.deleteProperty(navigator, 'clipboard')
+  window.history.replaceState({}, '', '/')
 })
 
-describe('computeScore', () => {
-  it('premia aciertos y penaliza intentos fallidos y el tiempo', () => {
-    expect(computeScore(6, 6, 0)).toBe(1100)
-    expect(computeScore(10, 6, 0)).toBe(1060)
-    expect(computeScore(6, 6, 100)).toBe(1050)
-    expect(computeScore(99, 0, 9999)).toBe(0)
+describe('puntuación', () => {
+  it('multiplica por la racha de aciertos consecutivos', () => {
+    expect(multiplierFor(0)).toBe(1)
+    expect(multiplierFor(1)).toBe(1)
+    expect(multiplierFor(2)).toBe(2)
+    expect(multiplierFor(4)).toBe(2)
+    expect(multiplierFor(5)).toBe(3)
   })
 
-  it('sumas por tiempo restante en contra reloj y por vidas en modo vidas', () => {
-    expect(computeScore(6, 6, 10, { mode: 'reloj', timeLimit: 90 })).toBe(600 + 80 * 10)
-    expect(computeScore(6, 6, 10, { mode: 'vidas', lives: 5 })).toBe(600 + 495 + 5 * 50)
-  })
-
-  it('cobra 150 puntos por cada pista usada', () => {
-    expect(computeScore(6, 6, 0, { hintsUsed: 1 })).toBe(950)
-    expect(computeScore(6, 6, 0, { hintsUsed: 3 })).toBe(650)
+  it('calcula el bono de tiempo y el bono final por modo', () => {
+    expect(timeBonus('reloj', 10, 90)).toBe(80 * 10)
+    expect(timeBonus('clasico', 10, 0)).toBe(500 - 5)
+    expect(finalBonus({ mode: 'vidas', seconds: 10, timeLimit: 0, lives: 5 })).toBe(495 + 250)
+    expect(finalBonus({ mode: 'zen', seconds: 0, timeLimit: 0, lives: null })).toBe(500)
   })
 })
 
@@ -339,7 +363,7 @@ describe('estadísticas y logros', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
     const dialog = screen.getByRole('dialog', { name: 'Estadísticas' })
     expect(within(dialog).getByText(/Tus estadísticas/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/Logros \(3\/8\)/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Logros \(4\/16\)/)).toBeInTheDocument()
     expect(within(dialog).getByText('Primera victoria')).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
@@ -359,7 +383,7 @@ describe('estadísticas y logros', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
     const dialog = screen.getByRole('dialog', { name: 'Estadísticas' })
-    expect(within(dialog).getByText(/Logros \(3\/8\)/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Logros \(4\/16\)/)).toBeInTheDocument()
   })
 })
 
@@ -413,3 +437,410 @@ describe('tutorial', () => {
     expect(screen.getByRole('dialog', { name: 'Cómo se juega' })).toBeInTheDocument()
   })
 })
+
+describe('comodín y racha', () => {
+  it('usa el comodín una sola vez por partida', () => {
+    startEasyGame()
+    const wild = screen.getByRole('button', { name: '🎁 Comodín' })
+    expect(wild).not.toBeDisabled()
+
+    fireEvent.click(wild)
+
+    expect(screen.getByText('1/6')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '🎁 Comodín' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Comodín usado: par')
+  })
+
+  it('suma puntos y activa el multiplicador tras aciertos seguidos', () => {
+    const board = startEasyGame()
+    const groups = pairGroups(board)
+
+    fireEvent.click(groups[0][0])
+    fireEvent.click(groups[0][1])
+    expect(scoreValue()).toBe('100')
+
+    fireEvent.click(groups[1][0])
+    fireEvent.click(groups[1][1])
+    expect(scoreValue()).toBe('300')
+    expect(screen.getByText(/Racha ×2/)).toBeInTheDocument()
+  })
+})
+
+describe('modo zen', () => {
+  it('no aplica multiplicadores ni vidas', () => {
+    const board = startEasyGame('Zen')
+    const groups = pairGroups(board)
+
+    fireEvent.click(groups[0][0])
+    fireEvent.click(groups[0][1])
+    fireEvent.click(groups[1][0])
+    fireEvent.click(groups[1][1])
+
+    expect(scoreValue()).toBe('200')
+    expect(screen.queryByText(/❤️/)).not.toBeInTheDocument()
+  })
+})
+
+describe('dificultad experto', () => {
+  it('inicia con 24 pares y 48 cartas', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Experto · 24 pares' }))
+
+    const board = screen.getByRole('grid')
+    expect(within(board).getAllByRole('button')).toHaveLength(48)
+    expect(screen.getByText('0/24')).toBeInTheDocument()
+  })
+})
+
+describe('partida guardada', () => {
+  it('guarda la partida en curso y permite continuarla con el mismo mazo', () => {
+    const view = render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fácil · 6 pares' }))
+    const board = screen.getByRole('grid')
+    fireEvent.click(within(board).getAllByRole('button')[0])
+    const before = boardLabels(board)
+
+    view.unmount()
+    expect(localStorage.getItem('salud-mental:session')).not.toBeNull()
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '▶ Continuar partida guardada' }))
+    const resumed = screen.getByRole('grid')
+    expect(boardLabels(resumed)).toEqual(before)
+    expect(screen.queryByText('¿Listo para entrenar la memoria?')).not.toBeInTheDocument()
+  })
+})
+
+describe('panel de estadísticas ampliado', () => {
+  it('muestra nivel, historial, heatmap y metas tras una victoria', () => {
+    winEasyGame()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
+    const dialog = screen.getByRole('dialog', { name: 'Estadísticas' })
+
+    expect(within(dialog).getByText('Nivel: Practicante (485 XP)')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Últimas partidas/)).toBeInTheDocument()
+    expect(within(dialog).getByText('ganó')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Juega 3 partidas \(1\/3\)/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Encuentra 50 pares \(6\/50\)/)).toBeInTheDocument()
+    expect(within(dialog).getAllByTitle(/^\d{4}-\d{2}-\d{2}$/)).toHaveLength(210)
+  })
+
+  it('exporta CSV y JSON generando un blob', () => {
+    winEasyGame()
+    const createObjectURL = vi.fn(() => 'blob:fake')
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectURL,
+      configurable: true,
+      writable: true,
+    })
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
+    const dialog = screen.getByRole('dialog', { name: 'Estadísticas' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '⬇ CSV' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '⬇ Exportar JSON' }))
+
+    expect(createObjectURL).toHaveBeenCalledTimes(2)
+    expect(clickSpy).toHaveBeenCalledTimes(2)
+
+    clickSpy.mockRestore()
+    delete (URL as { createObjectURL?: unknown }).createObjectURL
+  })
+
+  it('borra todo el progreso con confirmación', () => {
+    winEasyGame()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
+    const dialog = screen.getByRole('dialog', { name: 'Estadísticas' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '🗑 Borrar todo' }))
+
+    expect(localStorage.getItem('salud-mental:stats')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Estadísticas' })).not.toBeInTheDocument()
+  })
+})
+
+describe('reto del día', () => {
+  it('muestra completado el reto del día de hoy', () => {
+    localStorage.setItem(
+      'salud-mental:daily',
+      JSON.stringify({ date: todayISO(), done: true }),
+    )
+    render(<App />)
+    expect(screen.getByRole('button', { name: '📅 ✅ Reto del día' })).toBeInTheDocument()
+  })
+
+  it('al ganar la baraja del día lo marca como hecho', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Reto del día/ }))
+    const board = screen.getByRole('grid')
+    for (const group of pairGroups(board)) {
+      fireEvent.click(group[0])
+      fireEvent.click(group[1])
+    }
+
+    const saved = JSON.parse(localStorage.getItem('salud-mental:daily') ?? '{}') as {
+      date?: string
+      done?: boolean
+    }
+    expect(saved.done).toBe(true)
+    expect(saved.date).toBe(todayISO())
+  })
+})
+
+describe('check-in diario', () => {
+  it('registra el ánimo del día y lo cuenta en estadísticas', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Me siento bien' }))
+
+    expect(screen.getByText('¡Registrado! Vuelve mañana.')).toBeInTheDocument()
+    const saved = JSON.parse(localStorage.getItem('salud-mental:stats') ?? '{}') as {
+      checkins?: number
+    }
+    expect(saved.checkins).toBe(1)
+  })
+})
+
+describe('bienestar en partida', () => {
+  it('abre la respiración guiada y la cierra', () => {
+    startEasyGame()
+    fireEvent.click(screen.getByRole('button', { name: 'Pausa consciente: respiración guiada' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Pausa consciente: respiración guiada' })
+    expect(within(dialog).getByText('Inhala por la nariz')).toBeInTheDocument()
+    expect(within(dialog).getByText('Ciclos completados: 0')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Listo, gracias' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('abre los primeros auxilios con la Línea 106', () => {
+    startEasyGame()
+    fireEvent.click(screen.getByRole('button', { name: 'Primeros auxilios emocionales' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Primeros auxilios emocionales' })
+    expect(within(dialog).getByText(/Escucha sin interrumpir/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Si hay riesgo inmediato/)).toBeInTheDocument()
+    const helpLinks = within(dialog)
+      .getAllByRole('link')
+      .filter((link) => (link.textContent ?? '').includes('Línea 106'))
+    expect(helpLinks.length).toBeGreaterThan(0)
+  })
+})
+
+describe('mini quiz', () => {
+  it('juega tres preguntas tras ganar y cierra con el resultado', () => {
+    winEasyGame()
+    fireEvent.click(screen.getByRole('button', { name: '🧠 Quiz' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Quiz' })
+    expect(within(dialog).getByText('Pregunta 1 de 3')).toBeInTheDocument()
+
+    for (let round = 0; round < 3; round++) {
+      const options = within(dialog)
+        .getAllByRole('button')
+        .filter((button) => button.className.includes('quiz__option'))
+      expect(options).toHaveLength(4)
+      fireEvent.click(options[0])
+      expect(within(dialog).getByText(/¡Correcto!|No: la respuesta era/)).toBeInTheDocument()
+      fireEvent.click(
+        within(dialog).getByRole('button', {
+          name: round === 2 ? 'Terminar' : 'Siguiente',
+        }),
+      )
+    }
+
+    expect(within(dialog).getByText(/Acertaste \d de 3/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog', { name: 'Quiz' })).not.toBeInTheDocument()
+
+    const saved = JSON.parse(localStorage.getItem('salud-mental:stats') ?? '{}') as {
+      quizCorrect?: number
+    }
+    expect(saved.quizCorrect).toBeDefined()
+  })
+})
+
+describe('campaña', () => {
+  it('lista 10 etapas con solo la primera desbloqueada', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Campaña/ }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Campaña de retos' })
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(10)
+    const stageButtons = within(dialog)
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('stage__btn'))
+    expect(stageButtons).toHaveLength(10)
+    expect(stageButtons.filter((button) => (button as HTMLButtonElement).disabled)).toHaveLength(9)
+  })
+
+  it('juega la etapa 1 con sus cartas fijas', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Campaña/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Campaña de retos' })
+    const firstStage = within(dialog)
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('stage__btn'))[0]
+    fireEvent.click(firstStage)
+
+    expect(screen.getByRole('grid')).toBeInTheDocument()
+    expect(screen.getByText('0/3')).toBeInTheDocument()
+  })
+})
+
+describe('certificado', () => {
+  it('muestra el certificado cuando se completaron las 10 etapas', () => {
+    localStorage.setItem(
+      'salud-mental:stats',
+      JSON.stringify({
+        games: 12,
+        wins: 12,
+        losses: 0,
+        streak: 4,
+        bestStreak: 4,
+        pairs: 140,
+        perfect: 6,
+        bestTime: 30,
+        achievements: [],
+        daysPlayed: [],
+        history: [],
+        quizCorrect: 6,
+        stagesDone: 10,
+        checkins: 5,
+      }),
+    )
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver estadísticas y logros' }))
+    const statsDialog = screen.getByRole('dialog', { name: 'Estadísticas' })
+    fireEvent.click(within(statsDialog).getByRole('button', { name: '📜 Certificado' }))
+
+    const cert = screen.getByRole('dialog', { name: '📜 Certificado de bienestar' })
+    expect(within(cert).getByLabelText('Tu nombre')).toBeInTheDocument()
+    expect(within(cert).getByText(/completó la campaña de 10 etapas/)).toBeInTheDocument()
+  })
+})
+
+describe('retos y parámetros de URL', () => {
+  it('muestra el reto con ?reto y lo marca al superarlo', () => {
+    window.history.replaceState({}, '', '/?reto=100')
+    render(<App />)
+    expect(screen.getByText(/Reto: supera 100 puntos/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fácil · 6 pares' }))
+    const board = screen.getByRole('grid')
+    for (const group of pairGroups(board)) {
+      fireEvent.click(group[0])
+      fireEvent.click(group[1])
+    }
+
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByText('🏆 ¡Reto superado!')).toBeInTheDocument()
+  })
+
+  it('genera siempre el mismo mazo con ?seed', () => {
+    window.history.replaceState({}, '', '/?seed=42')
+
+    const first = render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fácil · 6 pares' }))
+    const firstLabels = boardLabels(screen.getByRole('grid'))
+    first.unmount()
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Fácil · 6 pares' }))
+    expect(boardLabels(screen.getByRole('grid'))).toEqual(firstLabels)
+    expect(firstLabels.filter((label) => label === 'Carta boca abajo')).toHaveLength(12)
+  })
+
+  it('activa el modo aula con ?kiosk=1', () => {
+    window.history.replaceState({}, '', '/?kiosk=1')
+    render(<App />)
+
+    expect(document.querySelector('.app--kiosk')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Dificultad' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver estadísticas y logros' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Salir del modo aula' })).toBeInTheDocument()
+  })
+})
+
+describe('i18n', () => {
+  it('alterna entre inglés y español', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar idioma' }))
+
+    expect(screen.getByRole('heading', { name: 'Ready to train your memory?' })).toBeInTheDocument()
+    expect(localStorage.getItem('salud-mental:lang')).toBe('en')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change language' }))
+    expect(screen.getByRole('heading', { name: '¿Listo para entrenar la memoria?' })).toBeInTheDocument()
+  })
+})
+
+describe('límite de errores', () => {
+  it('muestra la pantalla de error ante una excepción', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    function Bomb(): never {
+      throw new Error('boom')
+    }
+
+    render(
+      <ErrorBoundary>
+        <Bomb />
+      </ErrorBoundary>,
+    )
+
+    expect(screen.getByText('Algo salió mal 😕')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Recargar' })).toBeInTheDocument()
+    spy.mockRestore()
+  })
+})
+
+describe('imagen para compartir', () => {
+  it('informa fallo si el navegador no puede generar la imagen', async () => {
+    winEasyGame()
+    fireEvent.click(screen.getByRole('button', { name: '🖼️ Imagen' }))
+
+    expect(await screen.findByRole('button', { name: 'No se pudo' })).toBeInTheDocument()
+  })
+})
+
+describe('modo duelo', () => {
+  it('cambia el turno cuando falla un jugador', () => {
+    vi.useFakeTimers()
+    const board = startEasyGame('Duelo')
+    expect(statByLabel('Turno')).toHaveTextContent('1')
+
+    const groups = pairGroups(board)
+    fireEvent.click(groups[0][0])
+    fireEvent.click(groups[1][0])
+    act(() => {
+      vi.advanceTimersByTime(900)
+    })
+
+    expect(statByLabel('Turno')).toHaveTextContent('2')
+  })
+})
+
+describe('música ambiental', () => {
+  it('la activa y la persiste', () => {
+    startEasyGame()
+    const toggle = screen.getByRole('button', { name: 'Música ambiental' })
+    expect(toggle.className).not.toContain('btn--on')
+
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Música ambiental' }).className).toContain('btn--on')
+    expect(localStorage.getItem('salud-mental:ambient')).toBe('true')
+  })
+})
+
+describe('confeti', () => {
+  it('muestra confeti en la pantalla de victoria', () => {
+    winEasyGame()
+    expect(document.querySelector('[data-confetti]')).toBeInTheDocument()
+  })
+})
+

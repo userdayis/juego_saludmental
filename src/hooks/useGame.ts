@@ -8,22 +8,28 @@ import {
   type Difficulty,
   type Mode,
 } from '../data/cards'
+import { mulberry32, randomSeed, shuffleWith } from '../utils/seed'
 import { playSound, vibrate } from '../utils/sound'
 
-export type DeckCard = {
-  key: string
-  itemId: string
-}
+export type DeckCard = { key: string; itemId: string }
 
 export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
 export type LoseReason = 'time' | 'lives' | null
 
 export type GameState = {
   deck: DeckCard[]
+  seed: number
   flipped: number[]
   hintOpen: boolean
   hintsLeft: number
   hintsUsed: number
+  wildsLeft: number
+  wildsUsed: number
+  streak: number
+  duelStreaks: [number, number]
+  duelScores: [number, number]
+  turn: 0 | 1
+  duelWinner: number | null
   matched: Set<string>
   moves: number
   score: number
@@ -36,13 +42,6 @@ export type GameState = {
   mode: Mode
 }
 
-export type ScoreOptions = {
-  mode?: Mode
-  timeLimit?: number
-  lives?: number | null
-  hintsUsed?: number
-}
-
 const BASE_MATCH_POINTS = 100
 const FAIL_PENALTY = 10
 const CLASSIC_TIME_BONUS = 500
@@ -50,59 +49,57 @@ const TIME_STEP_SECONDS = 10
 const TIME_STEP_PENALTY = 5
 const CLOCK_POINTS_PER_SECOND = 10
 const LIFE_POINTS = 50
-const HINT_COST = 150
+export const HINT_COST = 150
+export const WILD_COST = 200
 const MISMATCH_DELAY_MS = 800
 const HINT_DELAY_MS = 1500
 
-export function computeScore(
-  moves: number,
-  matchedCount: number,
-  seconds: number,
-  options: ScoreOptions = {},
-): number {
-  const mode = options.mode ?? 'clasico'
-  const matchBonus = matchedCount * BASE_MATCH_POINTS
-  const attempts = Math.max(0, moves - matchedCount)
-  const penalty = attempts * FAIL_PENALTY + Math.max(0, options.hintsUsed ?? 0) * HINT_COST
-
-  let bonus = 0
-  if (mode === 'reloj') {
-    const timeLeft = Math.max(0, (options.timeLimit ?? 0) - seconds)
-    bonus = timeLeft * CLOCK_POINTS_PER_SECOND
-  } else {
-    bonus = Math.max(0, CLASSIC_TIME_BONUS - Math.floor(seconds / TIME_STEP_SECONDS) * TIME_STEP_PENALTY)
-    if (mode === 'vidas') {
-      bonus += Math.max(0, options.lives ?? 0) * LIFE_POINTS
-    }
-  }
-
-  return Math.max(0, matchBonus + bonus - penalty)
+export function multiplierFor(streak: number): number {
+  if (streak >= 5) return 3
+  if (streak >= 2) return 2
+  return 1
 }
 
-function shuffle<T>(items: T[]): T[] {
-  const arr = [...items]
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-  return arr
+export function timeBonus(mode: Mode, seconds: number, timeLimit: number): number {
+  if (mode === 'reloj') return Math.max(0, timeLimit - seconds) * CLOCK_POINTS_PER_SECOND
+  return Math.max(0, CLASSIC_TIME_BONUS - Math.floor(seconds / TIME_STEP_SECONDS) * TIME_STEP_PENALTY)
 }
 
-function buildDeck(pairs: number): DeckCard[] {
-  const items = shuffle(CARD_ITEMS).slice(0, pairs)
+export function finalBonus(state: Pick<GameState, 'mode' | 'seconds' | 'timeLimit' | 'lives'>): number {
+  let bonus = timeBonus(state.mode, state.seconds, state.timeLimit)
+  if (state.mode === 'vidas') bonus += Math.max(0, state.lives ?? 0) * LIFE_POINTS
+  return bonus
+}
+
+function buildDeck(pairs: number, seed: number, itemIds?: string[]): DeckCard[] {
+  const rng = mulberry32(seed)
+  const base = itemIds
+    ? itemIds
+        .map((id) => CARD_ITEMS.find((item) => item.id === id))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    : CARD_ITEMS
+  const items = shuffleWith(base, rng).slice(0, pairs)
   const deck = items.flatMap((item) => [
     { key: `${item.id}-a`, itemId: item.id },
     { key: `${item.id}-b`, itemId: item.id },
   ])
-  return shuffle(deck)
+  return shuffleWith(deck, rng)
 }
 
 const INITIAL_STATE: GameState = {
   deck: [],
+  seed: 0,
   flipped: [],
   hintOpen: false,
   hintsLeft: 0,
   hintsUsed: 0,
+  wildsLeft: 0,
+  wildsUsed: 0,
+  streak: 0,
+  duelStreaks: [0, 0],
+  duelScores: [0, 0],
+  turn: 0,
+  duelWinner: null,
   matched: new Set<string>(),
   moves: 0,
   score: 0,
@@ -115,17 +112,81 @@ const INITIAL_STATE: GameState = {
   mode: 'clasico',
 }
 
+const SESSION_KEY = 'salud-mental:session'
+const SESSION_V = 2
+
+type SerializedSession = Omit<GameState, 'matched'> & { matched: string[]; v: number }
+
+function serialize(state: GameState): SerializedSession {
+  return { ...state, matched: [...state.matched], v: SESSION_V }
+}
+
+function isSession(value: unknown): value is SerializedSession {
+  if (typeof value !== 'object' || value === null) return false
+  const s = value as Partial<SerializedSession>
+  return (
+    s.v === SESSION_V &&
+    Array.isArray(s.deck) &&
+    s.deck.length > 0 &&
+    Array.isArray(s.flipped) &&
+    Array.isArray(s.matched) &&
+    s.status === 'playing' &&
+    typeof s.seed === 'number' &&
+    typeof s.mode === 'string' &&
+    typeof s.difficulty === 'string'
+  )
+}
+
+export function loadSession(): GameState | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (!isSession(parsed)) return null
+    const { v: _v, matched, ...rest } = parsed
+    void _v
+    return { ...rest, matched: new Set(matched), status: 'playing' }
+  } catch {
+    return null
+  }
+}
+
+function saveSession(state: GameState): void {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(serialize(state)))
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
 export function useGame() {
   const [state, setState] = useState<GameState>(INITIAL_STATE)
-  const previousRef = useRef<GameState>(state)
 
-  const startGame = useCallback((mode: Mode, difficulty: Difficulty) => {
+  const startGame = useCallback((mode: Mode, difficulty: Difficulty, seed?: number, itemIds?: string[]) => {
+    const finalSeed = seed ?? randomSeed()
+    const pairs = itemIds && itemIds.length > 0 ? itemIds.length / 2 : PAIRS_BY_DIFFICULTY[difficulty]
     setState({
-      deck: buildDeck(PAIRS_BY_DIFFICULTY[difficulty]),
+      deck: buildDeck(pairs, finalSeed, itemIds),
+      seed: finalSeed,
       flipped: [],
       hintOpen: false,
       hintsLeft: HINTS_BY_DIFFICULTY[difficulty],
       hintsUsed: 0,
+      wildsLeft: 1,
+      wildsUsed: 0,
+      streak: 0,
+      duelStreaks: [0, 0],
+      duelScores: [0, 0],
+      turn: 0,
+      duelWinner: null,
       matched: new Set<string>(),
       moves: 0,
       score: 0,
@@ -137,6 +198,10 @@ export function useGame() {
       difficulty,
       mode,
     })
+  }, [])
+
+  const resumeGame = useCallback((session: GameState) => {
+    setState(session)
   }, [])
 
   const flipCard = useCallback((index: number) => {
@@ -153,29 +218,56 @@ export function useGame() {
       const moves = prev.moves + 1
       const [first, second] = flipped
       const isMatch = prev.deck[first].itemId === prev.deck[second].itemId
-      const matched = isMatch ? new Set(prev.matched).add(prev.deck[first].itemId) : prev.matched
-      const totalPairs = prev.deck.length / 2
-      const options: ScoreOptions = {
-        mode: prev.mode,
-        timeLimit: prev.timeLimit,
-        lives: prev.lives,
-        hintsUsed: prev.hintsUsed,
-      }
 
       if (isMatch) {
-        const status: GameStatus = matched.size === totalPairs ? 'won' : 'playing'
+        const streak = prev.mode === 'duelo' ? prev.duelStreaks[prev.turn] + 1 : prev.streak + 1
+        const points = prev.mode === 'zen' ? BASE_MATCH_POINTS : BASE_MATCH_POINTS * multiplierFor(streak)
+        const matched = new Set(prev.matched).add(prev.deck[first].itemId)
+        const duelStreaks: [number, number] =
+          prev.mode === 'duelo'
+            ? prev.turn === 0
+              ? [streak, prev.duelStreaks[1]]
+              : [prev.duelStreaks[0], streak]
+            : prev.duelStreaks
+        const duelScores: [number, number] =
+          prev.mode === 'duelo'
+            ? prev.turn === 0
+              ? [prev.duelScores[0] + points, prev.duelScores[1]]
+              : [prev.duelScores[0], prev.duelScores[1] + points]
+            : prev.duelScores
+        const totalPairs = prev.deck.length / 2
+        const won = matched.size === totalPairs
+        const bonus = won ? finalBonus(prev) : 0
+        const score = prev.score + points + bonus
+        const duelWinner =
+          won && prev.mode === 'duelo' ? (duelScores[0] >= duelScores[1] ? 1 : 2) : prev.duelWinner
+
         return {
           ...prev,
           flipped: [],
           hintOpen: false,
           moves,
           matched,
-          status,
-          score: computeScore(moves, matched.size, prev.seconds, options),
+          streak,
+          duelStreaks,
+          duelScores,
+          score,
+          status: won ? 'won' : 'playing',
+          duelWinner,
         }
       }
 
-      return { ...prev, flipped, moves }
+      const penalty = prev.mode === 'zen' ? 0 : FAIL_PENALTY
+      const score = Math.max(0, prev.score - penalty)
+      const turn: 0 | 1 = prev.mode === 'duelo' ? ((1 - prev.turn) as 0 | 1) : prev.turn
+      const duelStreaks: [number, number] =
+        prev.mode === 'duelo'
+          ? prev.turn === 0
+            ? [0, prev.duelStreaks[1]]
+            : [prev.duelStreaks[0], 0]
+          : prev.duelStreaks
+
+      return { ...prev, flipped, moves, score, streak: 0, duelStreaks, turn }
     })
   }, [])
 
@@ -197,12 +289,7 @@ export function useGame() {
 
       const pick = candidates[Math.floor(Math.random() * candidates.length)]
       const hintsUsed = prev.hintsUsed + 1
-      const score = computeScore(prev.moves, prev.matched.size, prev.seconds, {
-        mode: prev.mode,
-        timeLimit: prev.timeLimit,
-        lives: prev.lives,
-        hintsUsed,
-      })
+      const cost = prev.mode === 'zen' ? 0 : HINT_COST
 
       return {
         ...prev,
@@ -210,7 +297,49 @@ export function useGame() {
         hintOpen: true,
         hintsUsed,
         hintsLeft: prev.hintsLeft - 1,
+        score: Math.max(0, prev.score - cost),
+      }
+    })
+  }, [])
+
+  const useWild = useCallback(() => {
+    setState((prev) => {
+      if (prev.status !== 'playing') return prev
+      if (prev.flipped.length > 0 || prev.hintOpen) return prev
+      if (prev.wildsLeft <= 0) return prev
+
+      const groups = new Map<string, number[]>()
+      prev.deck.forEach((card) => {
+        if (prev.matched.has(card.itemId)) return
+        const list = groups.get(card.itemId) ?? []
+        list.push(1)
+        groups.set(card.itemId, list)
+      })
+      const candidates = [...groups.keys()].filter((id) => groups.get(id)?.length === 2)
+      if (candidates.length === 0) return prev
+
+      const itemId = candidates[Math.floor(Math.random() * candidates.length)]
+      const matched = new Set(prev.matched).add(itemId)
+      const totalPairs = prev.deck.length / 2
+      const won = matched.size === totalPairs
+      const cost = prev.mode === 'zen' ? 0 : WILD_COST
+      const bonus = won ? finalBonus(prev) : 0
+      const score = Math.max(0, prev.score - cost) + bonus
+      const duelWinner =
+        won && prev.mode === 'duelo'
+          ? prev.duelScores[0] >= prev.duelScores[1]
+            ? 1
+            : 2
+          : prev.duelWinner
+
+      return {
+        ...prev,
+        matched,
+        wildsLeft: prev.wildsLeft - 1,
+        wildsUsed: prev.wildsUsed + 1,
         score,
+        status: won ? 'won' : 'playing',
+        duelWinner,
       }
     })
   }, [])
@@ -222,19 +351,7 @@ export function useGame() {
         if (prev.status !== 'playing') return prev
         const seconds = prev.seconds + 1
         if (prev.mode === 'reloj' && seconds >= prev.timeLimit) {
-          const options: ScoreOptions = {
-            mode: prev.mode,
-            timeLimit: prev.timeLimit,
-            lives: prev.lives,
-            hintsUsed: prev.hintsUsed,
-          }
-          return {
-            ...prev,
-            seconds: prev.timeLimit,
-            status: 'lost',
-            loseReason: 'time',
-            score: computeScore(prev.moves, prev.matched.size, prev.timeLimit, options),
-          }
+          return { ...prev, seconds: prev.timeLimit, status: 'lost', loseReason: 'time' }
         }
         return { ...prev, seconds }
       })
@@ -252,8 +369,7 @@ export function useGame() {
     return () => window.clearTimeout(id)
   }, [hintActive, state.flipped])
 
-  const mismatchOpen =
-    state.status === 'playing' && !state.hintOpen && state.flipped.length === 2
+  const mismatchOpen = state.status === 'playing' && !state.hintOpen && state.flipped.length === 2
 
   useEffect(() => {
     if (!mismatchOpen) return
@@ -266,16 +382,9 @@ export function useGame() {
 
         const lives = Math.max(0, (cur.lives ?? 0) - 1)
         const lost = lives === 0
-        const score = computeScore(cur.moves, cur.matched.size, cur.seconds, {
-          mode: cur.mode,
-          timeLimit: cur.timeLimit,
-          lives,
-          hintsUsed: cur.hintsUsed,
-        })
         return {
           ...next,
           lives,
-          score,
           status: lost ? 'lost' : cur.status,
           loseReason: lost ? 'lives' : cur.loseReason,
         }
@@ -284,6 +393,12 @@ export function useGame() {
     return () => window.clearTimeout(id)
   }, [mismatchOpen, state.flipped, state.deck])
 
+  useEffect(() => {
+    if (state.status === 'playing') saveSession(state)
+    else if (state.status === 'won' || state.status === 'lost') clearSession()
+  }, [state])
+
+  const previousRef = useRef(state)
   useEffect(() => {
     const previous = previousRef.current
     previousRef.current = state
@@ -303,6 +418,11 @@ export function useGame() {
       playSound('flip')
       return
     }
+    if (state.wildsUsed > previous.wildsUsed) {
+      playSound('match')
+      vibrate(30)
+      return
+    }
     if (state.moves > previous.moves) {
       if (state.matched.size > previous.matched.size) {
         playSound('match')
@@ -317,5 +437,5 @@ export function useGame() {
     }
   }, [state])
 
-  return { state, startGame, flipCard, useHint }
+  return { state, startGame, resumeGame, flipCard, useHint, useWild }
 }

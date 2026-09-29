@@ -92,3 +92,73 @@ export function vibrate(pattern: number | number[]): void {
     /* vibración no soportada */
   }
 }
+
+const AMBIENT_KEY = 'salud-mental:ambient'
+
+let ambientEnabled = false
+let ambientNodes: { oscs: OscillatorNode[]; lfo: OscillatorNode } | null = null
+
+if (typeof window !== 'undefined') {
+  try {
+    ambientEnabled = window.localStorage.getItem(AMBIENT_KEY) === 'true'
+  } catch {
+    ambientEnabled = false
+  }
+}
+
+export function isAmbientEnabled(): boolean {
+  return ambientEnabled
+}
+
+function startAmbient(): void {
+  const ctx = getContext()
+  if (!ctx || ambientNodes) return
+  const gain = ctx.createGain()
+  gain.gain.value = 0.014
+  gain.connect(ctx.destination)
+  const oscs = [196, 246.94, 293.66].map((freq) => {
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    osc.connect(gain)
+    osc.start()
+    return osc
+  })
+  const lfo = ctx.createOscillator()
+  lfo.frequency.value = 0.08
+  const lfoGain = ctx.createGain()
+  lfoGain.gain.value = 0.007
+  lfo.connect(lfoGain)
+  lfoGain.connect(gain.gain)
+  lfo.start()
+  ambientNodes = { oscs, lfo }
+}
+
+function stopAmbient(): void {
+  if (!ambientNodes) return
+  for (const osc of ambientNodes.oscs) {
+    try {
+      osc.stop()
+    } catch {
+      /* ya detenido */
+    }
+  }
+  try {
+    ambientNodes.lfo.stop()
+  } catch {
+    /* ya detenido */
+  }
+  ambientNodes = null
+}
+
+export function setAmbientEnabled(value: boolean): boolean {
+  ambientEnabled = value
+  try {
+    window.localStorage.setItem(AMBIENT_KEY, String(value))
+  } catch {
+    /* almacenamiento no disponible */
+  }
+  if (ambientEnabled) startAmbient()
+  else stopAmbient()
+  return ambientEnabled
+}

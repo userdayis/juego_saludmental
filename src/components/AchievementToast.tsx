@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import type { Achievement } from '../data/achievements'
+import { useI18n } from '../i18n/context'
+import { pick } from '../i18n'
 
 type AchievementToastProps = {
   achievement: Achievement
@@ -7,6 +9,8 @@ type AchievementToastProps = {
 }
 
 export function AchievementToast({ achievement, onDismiss }: AchievementToastProps) {
+  const { t, lang } = useI18n()
+
   useEffect(() => {
     const id = window.setTimeout(onDismiss, 3000)
     return () => window.clearTimeout(id)
@@ -18,9 +22,9 @@ export function AchievementToast({ achievement, onDismiss }: AchievementToastPro
         {achievement.icon}
       </span>
       <span>
-        <strong>¡Logro desbloqueado!</strong>
+        <strong>{t('toast.unlocked')}</strong>
         <span className="toast__name">
-          {achievement.name} · {achievement.description}
+          {pick(achievement.name, lang)} · {pick(achievement.description, lang)}
         </span>
       </span>
     </div>

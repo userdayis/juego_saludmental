@@ -834,3 +834,678 @@ button {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ========== Nuevos componentes (campaña, bienestar, retos, certificado) ========== */
+
+/* Ilustraciones SVG de la baraja */
+.card__art {
+  width: clamp(34px, 11vw, 52px);
+  height: clamp(34px, 11vw, 52px);
+  color: var(--primary-dark);
+}
+
+.card--matched .card__art {
+  color: var(--primary);
+}
+
+/* Nivel del jugador */
+.chip--level {
+  background: var(--primary-soft);
+  border-color: transparent;
+  color: var(--primary-dark);
+  font-weight: 700;
+  cursor: default;
+}
+
+/* Pantalla de inicio */
+.start__challenge {
+  display: inline-block;
+  background: var(--accent);
+  color: #4a3200;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: 999px;
+  margin: 14px 0 0;
+}
+
+.start__extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+/* HUD ampliado */
+.hud__stats {
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+}
+
+.stat__value--hot {
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+
+.btn--wild {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border: 1px solid var(--primary);
+}
+
+.btn--wild:hover:not(:disabled) {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn--wild:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Check-in diario */
+.checkin {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.checkin__title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.checkin__moods {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.checkin__mood {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.checkin__mood:hover:not(:disabled) {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.checkin__mood--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: scale(1.1);
+}
+
+.checkin__mood:disabled {
+  cursor: default;
+}
+
+.checkin__done {
+  color: var(--primary-dark);
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin: 10px 0 0;
+}
+
+.checkin__week {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.checkin__day {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+
+/* Respiración guiada */
+.breath {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 210px;
+  margin: 18px 0 4px;
+}
+
+.breath__circle {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  border: 4px solid var(--primary);
+  transform: scale(0.55);
+  transition-property: transform;
+  transition-timing-function: ease-in-out;
+}
+
+.breath__circle--in {
+  transform: scale(1);
+  transition-duration: 4s;
+}
+
+.breath__circle--hold {
+  transform: scale(1);
+  transition-duration: 0.3s;
+}
+
+.breath__circle--out {
+  transform: scale(0.55);
+  transition-duration: 8s;
+}
+
+.breath__phase {
+  position: relative;
+  z-index: 1;
+  font-weight: 700;
+  color: var(--primary-dark);
+  text-align: center;
+  max-width: 130px;
+}
+
+.breath__count {
+  position: absolute;
+  bottom: 4px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.breath__cycles {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  text-align: center;
+  margin: 4px 0 0;
+}
+
+/* Resultado: duelos y retos */
+.modal__duel {
+  color: var(--primary-dark);
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+/* Primeros auxilios emocionales */
+.aid-list {
+  text-align: left;
+  margin: 16px 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.aid-warning {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  text-align: left;
+  margin: 0;
+}
+
+/* Mini quiz */
+.quiz__progress {
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.quiz__question {
+  font-size: 1.15rem;
+}
+
+.quiz__options {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.quiz__option {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.quiz__option:hover:not(:disabled) {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.quiz__option--selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.quiz__option:disabled {
+  cursor: default;
+}
+
+.quiz__feedback {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.quiz__feedback--ok {
+  color: var(--primary-dark);
+}
+
+.quiz__feedback--bad {
+  color: var(--danger);
+}
+
+/* Campaña */
+.stages {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.stage__btn {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.stage__btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  transform: translateX(2px);
+}
+
+.stage--locked .stage__btn {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.stage__n {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.stage__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stage__text span {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.stage__pairs {
+  font-size: 0.72rem;
+  color: var(--primary-dark);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Estadísticas: nivel, historial, metas */
+.stats-level {
+  display: inline-block;
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.stats-empty {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-size: 0.9rem;
+  margin: 6px 0;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.history-list__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+
+.history-list__win {
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+
+.history-list__lose {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+
+.heatmap__cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.heatmap__cell--on {
+  background: var(--primary);
+}
+
+.goals-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+}
+
+.goals-list__item {
+  display: grid;
+  gap: 6px;
+}
+
+.goals-list__text {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.goals-list__bar {
+  height: 10px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.goals-list__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.achievement--unlocked {
+  border-color: var(--primary);
+}
+
+.tips-list__source {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Certificado */
+.certificate {
+  background: var(--surface);
+  border: 6px double var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: clamp(20px, 5vw, 36px);
+  max-width: 640px;
+  width: 100%;
+  text-align: center;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.certificate__org {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  color: var(--primary-dark);
+  font-weight: 800;
+  margin: 0;
+}
+
+.certificate__title {
+  margin: 8px 0 4px;
+  font-size: 1.4rem;
+}
+
+.certificate__lead {
+  color: var(--ink-soft);
+  margin: 14px 0 6px;
+}
+
+.certificate__name {
+  display: block;
+  margin: 0 auto;
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: inherit;
+  text-align: center;
+  border: none;
+  border-bottom: 2px dashed var(--primary);
+  background: transparent;
+  color: var(--ink);
+  padding: 6px 10px;
+  width: min(360px, 100%);
+  outline: none;
+}
+
+.certificate__name:focus {
+  border-bottom-style: solid;
+}
+
+.certificate__text {
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 14px auto;
+  max-width: 460px;
+}
+
+.certificate__date {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+/* Pantalla de error */
+.error-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+
+.error-screen__icon {
+  font-size: 3rem;
+}
+
+.error-screen__title {
+  margin: 0;
+}
+
+.error-screen__text {
+  color: var(--ink-soft);
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+/* Modo aula / kiosco */
+.app--kiosk .footer,
+.app--kiosk .header__sena {
+  display: none;
+}
+
+.app--kiosk .card__label {
+  font-size: clamp(0.7rem, 2vw, 1rem);
+}
+
+.app--kiosk .btn {
+  padding: 14px 24px;
+}
+
+/* Paleta por dificultad */
+.app[data-difficulty='normal'] {
+  --primary: #2f8fbf;
+  --primary-dark: #1f6b93;
+  --primary-soft: #e6f1f8;
+  --btn-bg: #1f6b93;
+  --btn-hover: #175676;
+}
+
+.app[data-difficulty='dificil'] {
+  --primary: #8b5fbf;
+  --primary-dark: #6b4496;
+  --primary-soft: #f1eaf9;
+  --btn-bg: #6b4496;
+  --btn-hover: #563677;
+}
+
+.app[data-difficulty='experto'] {
+  --primary: #c0533f;
+  --primary-dark: #973e2e;
+  --primary-soft: #fbece8;
+  --btn-bg: #973e2e;
+  --btn-hover: #7a3124;
+}
+
+[data-theme='dark'] .app[data-difficulty='normal'] {
+  --primary: #4fb0dd;
+  --primary-dark: #7cc6e8;
+  --primary-soft: #1a2f3b;
+  --btn-bg: #2b7fae;
+  --btn-hover: #3d94c4;
+}
+
+[data-theme='dark'] .app[data-difficulty='dificil'] {
+  --primary: #a987db;
+  --primary-dark: #c4a9ec;
+  --primary-soft: #2a2138;
+  --btn-bg: #7c58b0;
+  --btn-hover: #9470c9;
+}
+
+[data-theme='dark'] .app[data-difficulty='experto'] {
+  --primary: #e4836d;
+  --primary-dark: #f0a692;
+  --primary-soft: #37211c;
+  --btn-bg: #b85a45;
+  --btn-hover: #cf7059;
+}
+
+/* Ajustes responsive */
+@media (max-width: 560px) {
+  .hud__stats {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  }
+
+  .stage__pairs {
+    display: none;
+  }
+
+  .heatmap {
+    gap: 2px;
+  }
+
+  .certificate {
+    border-width: 4px;
+  }
+}
+
+/* Impresión del certificado */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #certificate,
+  #certificate * {
+    visibility: visible;
+  }
+
+  #certificate {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    border: 6px double #2f9e76;
+    box-shadow: none;
+    max-height: none;
+  }
+
+  .modal__actions {
+    display: none;
+  }
+}

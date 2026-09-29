@@ -1,6 +1,9 @@
 import { memo } from 'react'
+import { useI18n } from '../i18n/context'
+import { CardArt } from './CardArt'
 
 type CardProps = {
+  itemId: string
   icon: string
   label: string
   flipped: boolean
@@ -10,7 +13,8 @@ type CardProps = {
   onClick: () => void
 }
 
-function CardComponent({ icon, label, flipped, matched, hinted, locked, onClick }: CardProps) {
+function CardComponent({ itemId, icon, label, flipped, matched, hinted, locked, onClick }: CardProps) {
+  const { t } = useI18n()
   const visible = flipped || matched
   const blocked = locked || matched
   return (
@@ -24,17 +28,16 @@ function CardComponent({ icon, label, flipped, matched, hinted, locked, onClick 
         onClick()
       }}
       aria-disabled={blocked}
-      aria-label={visible ? label : 'Carta boca abajo'}
+      aria-label={visible ? label : t('aria.cardDown')}
       aria-pressed={visible}
+      data-item={itemId}
     >
       <span className="card__inner">
         <span className="card__face card__back" aria-hidden="true">
           <span className="card__mark">?</span>
         </span>
         <span className="card__face card__front">
-          <span className="card__icon" aria-hidden="true">
-            {icon}
-          </span>
+          <CardArt itemId={itemId} fallback={icon} />
           <span className="card__label">{label}</span>
         </span>
       </span>
