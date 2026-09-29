@@ -37,6 +37,7 @@ export default function App() {
           <div>
             <h1 className="header__title">Memoria · Salud Mental</h1>
             <p className="header__subtitle">Encuentra los pares y llévate un tip de bienestar</p>
+            <p className="header__sena">SENA · Servicio Nacional de Aprendizaje</p>
           </div>
         </div>
 
@@ -101,6 +102,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
+        <p className="footer__sena">Proyecto de formación · SENA</p>
         <p>
           Este juego no sustituye atención profesional. Si lo necesitas, habla con alguien o busca apoyo
           especializado.
