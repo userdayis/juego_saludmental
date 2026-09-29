@@ -11,9 +11,12 @@ type HUDProps = {
   mode: Mode
   timeLimit: number
   lives: number | null
+  hintsLeft: number
+  hintBlocked: boolean
   best: HighScore | null
   soundEnabled: boolean
   onToggleSound: () => void
+  onHint: () => void
   onRestart: () => void
 }
 
@@ -26,9 +29,12 @@ export function HUD({
   mode,
   timeLimit,
   lives,
+  hintsLeft,
+  hintBlocked,
   best,
   soundEnabled,
   onToggleSound,
+  onHint,
   onRestart,
 }: HUDProps) {
   const countingDown = mode === 'reloj' && timeLimit > 0
@@ -69,6 +75,15 @@ export function HUD({
             Récord: {best.score}
           </span>
         )}
+        <button
+          type="button"
+          className="btn btn--hint"
+          onClick={onHint}
+          disabled={hintsLeft <= 0 || hintBlocked}
+          title="Destapa un par gratis (cuesta 150 puntos)"
+        >
+          💡 Pista ({hintsLeft})
+        </button>
         <button
           type="button"
           className="btn btn--ghost"

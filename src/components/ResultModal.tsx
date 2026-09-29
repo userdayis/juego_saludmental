@@ -1,7 +1,9 @@
-import { useEffect, useMemo, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { CARD_ITEMS, DIFFICULTIES, type Difficulty } from '../data/cards'
+import type { Achievement } from '../data/achievements'
 import { RESOURCES } from '../data/resources'
 import type { LoseReason } from '../hooks/useGame'
+import { shareScore } from '../utils/share'
 import { formatTime } from '../utils/format'
 
 type ResultModalProps = {
@@ -14,6 +16,7 @@ type ResultModalProps = {
   matchedIds: string[]
   totalPairs: number
   isRecord: boolean
+  unlocked: Achievement[]
   onRestart: () => void
   onClose: () => void
 }
@@ -28,9 +31,12 @@ export function ResultModal({
   matchedIds,
   totalPairs,
   isRecord,
+  unlocked,
   onRestart,
   onClose,
 }: ResultModalProps) {
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'shared' | 'failed'>('idle')
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -71,6 +77,16 @@ export function ResultModal({
           <span className="modal__score-label">puntos</span>
         </div>
 
+        {unlocked.length > 0 && (
+          <div className="unlocked" aria-label="Logros desbloqueados en esta partida">
+            {unlocked.map((achievement) => (
+              <span key={achievement.id} className="unlocked__badge">
+                {achievement.icon} {achievement.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="modal__tips">
           <h3 className="modal__tips-title">Para llevar</h3>
           <ul className="tips-list">
@@ -100,6 +116,27 @@ export function ResultModal({
         <div className="modal__actions">
           <button type="button" className="btn btn--primary" onClick={onRestart}>
             Jugar otra vez
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={async () => {
+              const outcome = await shareScore(score)
+              if (outcome === 'failed') {
+                setShareState('failed')
+                return
+              }
+              setShareState(outcome)
+              window.setTimeout(() => setShareState('idle'), 2500)
+            }}
+          >
+            {shareState === 'copied'
+              ? '¡Copiado!'
+              : shareState === 'shared'
+                ? '¡Compartido!'
+                : shareState === 'failed'
+                  ? 'No se pudo'
+                  : 'Compartir'}
           </button>
           <button type="button" className="btn btn--ghost" onClick={onClose}>
             Ver tablero

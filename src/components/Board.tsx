@@ -7,11 +7,12 @@ type BoardProps = {
   deck: DeckCard[]
   flipped: number[]
   matched: Set<string>
+  hintOpen: boolean
   locked: boolean
   onFlip: (index: number) => void
 }
 
-export function Board({ deck, flipped, matched, locked, onFlip }: BoardProps) {
+export function Board({ deck, flipped, matched, hintOpen, locked, onFlip }: BoardProps) {
   if (deck.length === 0) return null
   const columns = deck.length <= 12 ? 3 : deck.length <= 18 ? 4 : 5
 
@@ -32,6 +33,7 @@ export function Board({ deck, flipped, matched, locked, onFlip }: BoardProps) {
             label={item.label}
             flipped={flipped.includes(index)}
             matched={matched.has(card.itemId)}
+            hinted={hintOpen && flipped.includes(index)}
             locked={locked || flipped.length >= 2}
             onClick={() => onFlip(index)}
           />

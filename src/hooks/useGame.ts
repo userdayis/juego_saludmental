@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CARD_ITEMS,
+  HINTS_BY_DIFFICULTY,
   LIVES_BY_DIFFICULTY,
   PAIRS_BY_DIFFICULTY,
   TIME_LIMITS,
@@ -20,6 +21,9 @@ export type LoseReason = 'time' | 'lives' | null
 export type GameState = {
   deck: DeckCard[]
   flipped: number[]
+  hintOpen: boolean
+  hintsLeft: number
+  hintsUsed: number
   matched: Set<string>
   moves: number
   score: number
@@ -36,6 +40,7 @@ export type ScoreOptions = {
   mode?: Mode
   timeLimit?: number
   lives?: number | null
+  hintsUsed?: number
 }
 
 const BASE_MATCH_POINTS = 100
@@ -45,6 +50,9 @@ const TIME_STEP_SECONDS = 10
 const TIME_STEP_PENALTY = 5
 const CLOCK_POINTS_PER_SECOND = 10
 const LIFE_POINTS = 50
+const HINT_COST = 150
+const MISMATCH_DELAY_MS = 800
+const HINT_DELAY_MS = 1500
 
 export function computeScore(
   moves: number,
@@ -55,7 +63,7 @@ export function computeScore(
   const mode = options.mode ?? 'clasico'
   const matchBonus = matchedCount * BASE_MATCH_POINTS
   const attempts = Math.max(0, moves - matchedCount)
-  const penalty = attempts * FAIL_PENALTY
+  const penalty = attempts * FAIL_PENALTY + Math.max(0, options.hintsUsed ?? 0) * HINT_COST
 
   let bonus = 0
   if (mode === 'reloj') {
@@ -92,6 +100,9 @@ function buildDeck(pairs: number): DeckCard[] {
 const INITIAL_STATE: GameState = {
   deck: [],
   flipped: [],
+  hintOpen: false,
+  hintsLeft: 0,
+  hintsUsed: 0,
   matched: new Set<string>(),
   moves: 0,
   score: 0,
@@ -112,6 +123,9 @@ export function useGame() {
     setState({
       deck: buildDeck(PAIRS_BY_DIFFICULTY[difficulty]),
       flipped: [],
+      hintOpen: false,
+      hintsLeft: HINTS_BY_DIFFICULTY[difficulty],
+      hintsUsed: 0,
       matched: new Set<string>(),
       moves: 0,
       score: 0,
@@ -141,13 +155,19 @@ export function useGame() {
       const isMatch = prev.deck[first].itemId === prev.deck[second].itemId
       const matched = isMatch ? new Set(prev.matched).add(prev.deck[first].itemId) : prev.matched
       const totalPairs = prev.deck.length / 2
-      const options: ScoreOptions = { mode: prev.mode, timeLimit: prev.timeLimit, lives: prev.lives }
+      const options: ScoreOptions = {
+        mode: prev.mode,
+        timeLimit: prev.timeLimit,
+        lives: prev.lives,
+        hintsUsed: prev.hintsUsed,
+      }
 
       if (isMatch) {
         const status: GameStatus = matched.size === totalPairs ? 'won' : 'playing'
         return {
           ...prev,
           flipped: [],
+          hintOpen: false,
           moves,
           matched,
           status,
@@ -155,21 +175,43 @@ export function useGame() {
         }
       }
 
-      if (prev.mode === 'vidas') {
-        const lives = Math.max(0, (prev.lives ?? 0) - 1)
-        const lost = lives === 0
-        return {
-          ...prev,
-          flipped: [],
-          moves,
-          lives,
-          status: lost ? 'lost' : 'playing',
-          loseReason: lost ? 'lives' : null,
-          score: computeScore(moves, matched.size, prev.seconds, options),
-        }
-      }
-
       return { ...prev, flipped, moves }
+    })
+  }, [])
+
+  const useHint = useCallback(() => {
+    setState((prev) => {
+      if (prev.status !== 'playing') return prev
+      if (prev.flipped.length > 0 || prev.hintOpen) return prev
+      if (prev.hintsLeft <= 0) return prev
+
+      const groups = new Map<string, number[]>()
+      prev.deck.forEach((card, index) => {
+        if (prev.matched.has(card.itemId)) return
+        const list = groups.get(card.itemId) ?? []
+        list.push(index)
+        groups.set(card.itemId, list)
+      })
+      const candidates = [...groups.values()].filter((indexes) => indexes.length === 2)
+      if (candidates.length === 0) return prev
+
+      const pick = candidates[Math.floor(Math.random() * candidates.length)]
+      const hintsUsed = prev.hintsUsed + 1
+      const score = computeScore(prev.moves, prev.matched.size, prev.seconds, {
+        mode: prev.mode,
+        timeLimit: prev.timeLimit,
+        lives: prev.lives,
+        hintsUsed,
+      })
+
+      return {
+        ...prev,
+        flipped: pick,
+        hintOpen: true,
+        hintsUsed,
+        hintsLeft: prev.hintsLeft - 1,
+        score,
+      }
     })
   }, [])
 
@@ -180,7 +222,12 @@ export function useGame() {
         if (prev.status !== 'playing') return prev
         const seconds = prev.seconds + 1
         if (prev.mode === 'reloj' && seconds >= prev.timeLimit) {
-          const options: ScoreOptions = { mode: prev.mode, timeLimit: prev.timeLimit, lives: prev.lives }
+          const options: ScoreOptions = {
+            mode: prev.mode,
+            timeLimit: prev.timeLimit,
+            lives: prev.lives,
+            hintsUsed: prev.hintsUsed,
+          }
           return {
             ...prev,
             seconds: prev.timeLimit,
@@ -195,15 +242,45 @@ export function useGame() {
     return () => window.clearInterval(id)
   }, [state.status])
 
-  const mismatchOpen = state.status === 'playing' && state.flipped.length === 2
+  const hintActive = state.status === 'playing' && state.hintOpen && state.flipped.length === 2
+
+  useEffect(() => {
+    if (!hintActive) return
+    const id = window.setTimeout(() => {
+      setState((cur) => ({ ...cur, flipped: [], hintOpen: false }))
+    }, HINT_DELAY_MS)
+    return () => window.clearTimeout(id)
+  }, [hintActive, state.flipped])
+
+  const mismatchOpen =
+    state.status === 'playing' && !state.hintOpen && state.flipped.length === 2
 
   useEffect(() => {
     if (!mismatchOpen) return
     const [first, second] = state.flipped
     if (state.deck[first]?.itemId === state.deck[second]?.itemId) return
     const id = window.setTimeout(() => {
-      setState((cur) => ({ ...cur, flipped: [] }))
-    }, 800)
+      setState((cur) => {
+        const next: GameState = { ...cur, flipped: [], hintOpen: false }
+        if (cur.mode !== 'vidas') return next
+
+        const lives = Math.max(0, (cur.lives ?? 0) - 1)
+        const lost = lives === 0
+        const score = computeScore(cur.moves, cur.matched.size, cur.seconds, {
+          mode: cur.mode,
+          timeLimit: cur.timeLimit,
+          lives,
+          hintsUsed: cur.hintsUsed,
+        })
+        return {
+          ...next,
+          lives,
+          score,
+          status: lost ? 'lost' : cur.status,
+          loseReason: lost ? 'lives' : cur.loseReason,
+        }
+      })
+    }, MISMATCH_DELAY_MS)
     return () => window.clearTimeout(id)
   }, [mismatchOpen, state.flipped, state.deck])
 
@@ -222,6 +299,10 @@ export function useGame() {
       vibrate([80, 60, 80])
       return
     }
+    if (state.hintOpen && !previous.hintOpen) {
+      playSound('flip')
+      return
+    }
     if (state.moves > previous.moves) {
       if (state.matched.size > previous.matched.size) {
         playSound('match')
@@ -236,5 +317,5 @@ export function useGame() {
     }
   }, [state])
 
-  return { state, startGame, flipCard }
+  return { state, startGame, flipCard, useHint }
 }

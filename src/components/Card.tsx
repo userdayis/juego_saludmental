@@ -5,17 +5,20 @@ type CardProps = {
   label: string
   flipped: boolean
   matched: boolean
+  hinted: boolean
   locked: boolean
   onClick: () => void
 }
 
-function CardComponent({ icon, label, flipped, matched, locked, onClick }: CardProps) {
+function CardComponent({ icon, label, flipped, matched, hinted, locked, onClick }: CardProps) {
   const visible = flipped || matched
   const blocked = locked || matched
   return (
     <button
       type="button"
-      className={`card ${visible ? 'card--visible' : ''} ${matched ? 'card--matched' : ''}`}
+      className={`card ${visible ? 'card--visible' : ''} ${matched ? 'card--matched' : ''} ${
+        hinted ? 'card--hint' : ''
+      }`}
       onClick={() => {
         if (blocked) return
         onClick()

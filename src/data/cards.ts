@@ -90,6 +90,42 @@ export const CARD_ITEMS: CardItem[] = [
     label: 'Terapia',
     tip: 'Acudir a un profesional es una señal de fortaleza: pedir ayuda también es un hábito.',
   },
+  {
+    id: 'musica',
+    icon: '🎵',
+    label: 'Música',
+    tip: 'Escuchar música que te gusta baja el cortisol y mejora tu estado de ánimo en minutos.',
+  },
+  {
+    id: 'emociones',
+    icon: '💬',
+    label: 'Nombrar emociones',
+    tip: 'Ponerle nombre a lo que sientes («estoy ansioso») le quita intensidad a la emoción.',
+  },
+  {
+    id: 'rutina',
+    icon: '🕐',
+    label: 'Rutina',
+    tip: 'Horarios estables le dan seguridad a tu mente y mejoran la calidad de tu descanso.',
+  },
+  {
+    id: 'hidratacion',
+    icon: '💧',
+    label: 'Hidratación',
+    tip: 'Deshidratarte afecta tu concentración y tu humor: bebe agua durante todo el día.',
+  },
+  {
+    id: 'risa',
+    icon: '😂',
+    label: 'Risa',
+    tip: 'Reírte con otras personas libera endorfinas y refuerza tus vínculos.',
+  },
+  {
+    id: 'mascotas',
+    icon: '🐾',
+    label: 'Mascotas',
+    tip: 'El contacto con un animal baja la frecuencia cardíaca y la tensión arterial.',
+  },
 ]
 
 export type Difficulty = 'facil' | 'normal' | 'dificil'
@@ -101,7 +137,7 @@ export function getItemById(id: string): CardItem | undefined {
 export const DIFFICULTIES: { id: Difficulty; label: string; pairs: number }[] = [
   { id: 'facil', label: 'Fácil', pairs: 6 },
   { id: 'normal', label: 'Normal', pairs: 9 },
-  { id: 'dificil', label: 'Difícil', pairs: 14 },
+  { id: 'dificil', label: 'Difícil', pairs: 16 },
 ]
 
 export type Mode = 'clasico' | 'reloj' | 'vidas'
@@ -115,7 +151,13 @@ export const MODES: { id: Mode; label: string; hint: string }[] = [
 export const PAIRS_BY_DIFFICULTY: Record<Difficulty, number> = {
   facil: 6,
   normal: 9,
-  dificil: 14,
+  dificil: 16,
+}
+
+export const HINTS_BY_DIFFICULTY: Record<Difficulty, number> = {
+  facil: 3,
+  normal: 2,
+  dificil: 1,
 }
 
 export const TIME_LIMITS: Record<Difficulty, number> = {
