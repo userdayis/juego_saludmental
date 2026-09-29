@@ -67,7 +67,7 @@ src/
 2. En Vercel: *Add New → Project* → importa el repo (detecta Vite automáticamente).
 3. Deploy. Cada `push` a `main` redespliega automáticamente.
 
-> Si tu dominio final es distinto de `https://juego-saludmental.vercel.app`, actualiza las URLs `og:url`, `og:image` y `twitter:image` en `index.html`.
+> Si tu dominio final es distinto de `https://saludmental-five.vercel.app`, actualiza las URLs `og:url`, `og:image` y `twitter:image` en `index.html`.
 
 ---
 
