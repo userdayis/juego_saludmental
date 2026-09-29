@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { useI18n } from '../i18n/context'
-import { CardArt } from './CardArt'
 
 type CardProps = {
   itemId: string
@@ -37,7 +36,9 @@ function CardComponent({ itemId, icon, label, flipped, matched, hinted, locked, 
           <span className="card__mark">?</span>
         </span>
         <span className="card__face card__front">
-          <CardArt itemId={itemId} fallback={icon} />
+          <span className="card__emoji" aria-hidden="true">
+            {icon}
+          </span>
           <span className="card__label">{label}</span>
         </span>
       </span>
