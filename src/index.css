@@ -227,6 +227,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .hud__best {
@@ -801,27 +802,167 @@ button {
   background: var(--primary);
 }
 
+/* ========== Celulares (≤560px) ========== */
 @media (max-width: 560px) {
   .app {
-    padding: 16px 12px 24px;
+    padding: 14px max(12px, env(safe-area-inset-left)) 28px max(12px, env(safe-area-inset-right));
   }
 
   .header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 12px;
   }
 
+  .header__title {
+    font-size: 1.25rem;
+  }
+
+  .header__subtitle {
+    font-size: 0.82rem;
+  }
+
+  .header__controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  /* Filas de dificultad/modo con scroll horizontal, sin envolver */
+  .header__levels {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+
+  .header__levels::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chip {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+  }
+
+  .main {
+    margin-top: 16px;
+  }
+
+  /* Inicio */
+  .start {
+    margin: 20px auto;
+    padding: 24px 16px;
+  }
+
+  .start__challenge {
+    font-size: 0.82rem;
+    width: 100%;
+  }
+
+  .start__levels {
+    gap: 8px;
+  }
+
+  .start__levels .btn {
+    flex: 1 1 45%;
+    text-align: center;
+  }
+
+  .start__extras {
+    gap: 8px;
+  }
+
+  .start__extras .btn {
+    flex: 1 1 140px;
+  }
+
+  /* HUD */
   .hud {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+  }
+
+  .hud__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stat {
+    padding: 6px 4px;
+  }
+
+  .stat__label {
+    font-size: 0.66rem;
   }
 
   .hud__actions {
-    justify-content: space-between;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .hud__actions .btn {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 0.86rem;
   }
 
   .btn {
+    min-height: 44px;
     padding: 10px 16px;
+  }
+
+  /* Tablero: 4 columnas para que las cartas sigan siendo legibles */
+  .board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .card__label {
+    font-size: clamp(0.6rem, 2.6vw, 0.8rem);
+  }
+
+  /* Modales */
+  .modal {
+    padding: 20px 16px;
+  }
+
+  .modal__score-value {
+    font-size: clamp(2.2rem, 12vw, 3rem);
+  }
+
+  .modal__actions {
+    gap: 8px;
+  }
+
+  .modal__actions .btn {
+    flex: 1 1 130px;
+  }
+
+  .quiz__option {
+    min-height: 48px;
+    padding: 12px;
+  }
+
+  /* Estadísticas y check-in */
+  .history-list__item {
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .checkin__mood {
+    width: 56px;
+    height: 56px;
+  }
+
+  .stage__btn {
+    padding: 12px;
   }
 }
 
@@ -1466,12 +1607,8 @@ button {
   --btn-hover: #cf7059;
 }
 
-/* Ajustes responsive */
+/* Ajustes responsive de componentes nuevos */
 @media (max-width: 560px) {
-  .hud__stats {
-    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-  }
-
   .stage__pairs {
     display: none;
   }
@@ -1482,6 +1619,77 @@ button {
 
   .certificate {
     border-width: 4px;
+  }
+}
+
+/* Celulares muy pequeños (≤380px) */
+@media (max-width: 380px) {
+  .app {
+    padding: 10px max(10px, env(safe-area-inset-left)) 24px max(10px, env(safe-area-inset-right));
+  }
+
+  .header__logo {
+    font-size: 28px;
+  }
+
+  .header__sena {
+    font-size: 0.66rem;
+  }
+
+  .chip {
+    font-size: 0.82rem;
+    padding: 8px 10px;
+  }
+
+  .hud__actions .btn {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .stat__value {
+    font-size: 0.95rem;
+  }
+
+  .start {
+    padding: 20px 14px;
+  }
+
+  .start__levels .btn {
+    flex-basis: 100%;
+  }
+
+  .modal {
+    padding: 18px 14px;
+  }
+}
+
+/* Celulares en horizontal (altura reducida) */
+@media (max-height: 520px) and (orientation: landscape) {
+  .app {
+    padding-top: 8px;
+  }
+
+  .header__subtitle,
+  .header__sena {
+    display: none;
+  }
+
+  .header__logo {
+    font-size: 24px;
+  }
+
+  .main {
+    margin-top: 10px;
+  }
+
+  .start {
+    margin: 8px auto;
+    padding: 16px;
+  }
+
+  .modal,
+  .certificate {
+    max-height: 94vh;
   }
 }
 
