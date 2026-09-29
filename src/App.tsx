@@ -39,6 +39,21 @@ type Settings = { mode: Mode; difficulty: Difficulty }
 const TUTORIAL_KEY = 'salud-mental:tutorial-seen'
 const DAILY_KEY = 'salud-mental:daily'
 
+const MODE_ICONS: Record<Mode, string> = {
+  clasico: '🎴',
+  reloj: '⏱️',
+  vidas: '❤️',
+  zen: '🧘',
+  duelo: '⚔️',
+}
+
+const DIFFICULTY_ICONS: Record<Difficulty, string> = {
+  facil: '🌱',
+  normal: '🌿',
+  dificil: '🔥',
+  experto: '🏆',
+}
+
 function readDailyDone(): boolean {
   try {
     const raw = localStorage.getItem(DAILY_KEY)
@@ -331,6 +346,10 @@ function AppShell() {
   const multiplier =
     state.mode === 'duelo' ? multiplierFor(state.duelStreaks[state.turn]) : multiplierFor(state.streak)
 
+  const diffGroupProps = kiosk
+    ? {}
+    : { role: 'group' as const, 'aria-label': t('aria.difficulty') }
+
   return (
     <div className={`app ${kiosk ? 'app--kiosk' : ''}`} data-difficulty={settings.difficulty}>
       <div className="sr-only" role="status" aria-live="polite">
@@ -344,44 +363,26 @@ function AppShell() {
           </span>
           <div>
             <h1 className="header__title">{t('app.title')}</h1>
-            <p className="header__subtitle">{t('app.subtitle')}</p>
-            <p className="header__sena">{t('app.sena')}</p>
+            {state.status === 'idle' && (
+              <>
+                <p className="header__subtitle">{t('app.subtitle')}</p>
+                <p className="header__sena">{t('app.sena')}</p>
+              </>
+            )}
           </div>
         </div>
 
         <div className="header__controls">
+          {state.status !== 'idle' && (
+            <span className="pill">
+              {pick(DIFFICULTIES.find((d) => d.id === state.difficulty)?.label ?? { es: '', en: '' }, lang)}
+              {' · '}
+              {pick(MODES.find((m) => m.id === state.mode)?.label ?? { es: '', en: '' }, lang)}
+            </span>
+          )}
           <span className="chip chip--level" title={t('stats.level', { level: pick(level.name, lang), xp: level.xp })}>
             ⭐ {pick(level.name, lang)} · {level.xp} XP
           </span>
-
-          {!kiosk && (
-            <div className="header__levels" role="group" aria-label={t('aria.difficulty')}>
-              {DIFFICULTIES.map((levelOption) => (
-                <button
-                  key={levelOption.id}
-                  type="button"
-                  className={`chip ${settings.difficulty === levelOption.id ? 'chip--active' : ''}`}
-                  onClick={() => applySettings({ ...settings, difficulty: levelOption.id })}
-                >
-                  {pick(levelOption.label, lang)} · {levelOption.pairs}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="header__levels" role="group" aria-label={t('aria.mode')}>
-            {MODES.map((mode) => (
-              <button
-                key={mode.id}
-                type="button"
-                className={`chip ${settings.mode === mode.id ? 'chip--active' : ''}`}
-                title={pick(mode.hint, lang)}
-                onClick={() => applySettings({ ...settings, mode: mode.id })}
-              >
-                {pick(mode.label, lang)}
-              </button>
-            ))}
-          </div>
 
           {!kiosk && (
             <button
@@ -437,40 +438,79 @@ function AppShell() {
       <main className="main">
         {state.status === 'idle' ? (
           <section className="start">
-            <h2 className="start__title">{t('start.title')}</h2>
-            <p className="start__text">{t('start.text')}</p>
+            <div className="start__hero">
+              <span className="start__logo" aria-hidden="true">
+                🌿
+              </span>
+              <h2 className="start__title">{t('start.title')}</h2>
+              <p className="start__text">{t('start.text')}</p>
+            </div>
 
             {challengeTarget !== null && (
               <p className="start__challenge">🏆 {t('start.challenge', { score: challengeTarget })}</p>
             )}
 
-            <p className="start__mode">
-              {t('start.mode')}
-              <strong>
-                {pick(MODES.find((m) => m.id === settings.mode)?.label ?? { es: '', en: '' }, lang)}
-              </strong>
-            </p>
+            <div className="setup">
+              <div className="setup__group" role="group" aria-label={t('aria.mode')}>
+                <h3 className="setup__title">{t('aria.mode')}</h3>
+                <div className="setup__cards">
+                  {MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      className={`mode-card ${settings.mode === mode.id ? 'mode-card--active' : ''}`}
+                      aria-label={pick(mode.label, lang)}
+                      aria-pressed={settings.mode === mode.id}
+                      title={pick(mode.hint, lang)}
+                      onClick={() => applySettings({ ...settings, mode: mode.id })}
+                    >
+                      <span className="mode-card__icon" aria-hidden="true">
+                        {MODE_ICONS[mode.id]}
+                      </span>
+                      <span className="mode-card__label">{pick(mode.label, lang)}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="setup__hint">
+                  {pick(MODES.find((m) => m.id === settings.mode)?.hint ?? { es: '', en: '' }, lang)}
+                </p>
+              </div>
 
-            <div className="start__levels">
-              {hasSession && (
+              <div className="setup__group" {...diffGroupProps}>
+                <h3 className="setup__title">{t('aria.difficulty')}</h3>
+                <div className="setup__cards setup__cards--levels">
+                  {DIFFICULTIES.map((levelOption) => (
+                    <button
+                      key={levelOption.id}
+                      type="button"
+                      className={`diff-card ${settings.difficulty === levelOption.id ? 'diff-card--active' : ''}`}
+                      aria-label={`${pick(levelOption.label, lang)} · ${t('start.pairs', { pairs: levelOption.pairs })}`}
+                      aria-pressed={settings.difficulty === levelOption.id}
+                      onClick={() => {
+                        setSettings({ ...settings, difficulty: levelOption.id })
+                        play(settings.mode, levelOption.id)
+                      }}
+                    >
+                      <span className="diff-card__icon" aria-hidden="true">
+                        {DIFFICULTY_ICONS[levelOption.id]}
+                      </span>
+                      <span className="diff-card__label">{pick(levelOption.label, lang)}</span>
+                      <span className="diff-card__pairs">
+                        {t('start.pairs', { pairs: levelOption.pairs })}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {hasSession && (
+              <div className="start__levels">
                 <button type="button" className="btn btn--primary" onClick={resume}>
                   {t('start.continue')}
                 </button>
-              )}
-              {DIFFICULTIES.map((levelOption) => (
-                <button
-                  key={levelOption.id}
-                  type="button"
-                  className="btn btn--primary"
-                  onClick={() => {
-                    setSettings({ ...settings, difficulty: levelOption.id })
-                    play(settings.mode, levelOption.id)
-                  }}
-                >
-                  {pick(levelOption.label, lang)} · {t('start.pairs', { pairs: levelOption.pairs })}
-                </button>
-              ))}
-            </div>
+              </div>
+            )}
 
             <div className="start__extras">
               <button
